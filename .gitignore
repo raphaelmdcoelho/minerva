@@ -1,0 +1,16 @@
+*/env
+env
+env/*
+
+*/linux-env
+linux-env
+linux-env/*
+
+.env
+.flaskenv
+.env.*
+.flaskenv.*
+*.env
+*.flaskenv
+
+instance/*
