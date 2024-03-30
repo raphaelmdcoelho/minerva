@@ -1,3 +1,7 @@
+# Goal
+
+The goal of this project is to assist in the generation of content for blog articles, through the creation of structured text content and images following the pattern of the prompt informed by the user and allowing the input of some parameters for the standardization of images and generated content.
+
 # Structure
 
 ```
@@ -160,11 +164,19 @@ docker run -p 5000:5000 my-flask-app
 
 ## Testing
 
+From the root project folder, execute the following command:
+
+```bash
+python -m unittest discover ./src/app/tests  
+```
+
 ## Environment Variables and Secrets
 
 `FLASK_APP`: Tells Flask which application it should run. This could be the name of the Python file that creates your Flask application instance.
 
 `FLASK_RUN_HOST`: By default, the Flask development server listens on `localhost`. This is fine when you're running the server directly on your host machine because you can access your Flask application by visiting `http://localhost:5000` in your web browser. However, when running inside a Docker container, if Flask listens only on `localhost`, the application won't be accessible from outside the container because `localhost` inside the container is isolated from `localhost` on your host machine. Setting it to be `0.0.0.0` tells Flask to listen on all network interfaces inside the container. This setup allows incoming connections not just from within the container, but also from outside the container, including from your host machine.
+
+`OPENAI_API_KEY`: OpenAI api secret key value.
 
 ## General Information
 
