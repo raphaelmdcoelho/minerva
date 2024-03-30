@@ -6,6 +6,10 @@ env/*
 linux-env
 linux-env/*
 
+*/win-env
+win-env
+win-env/*
+
 .env
 .flaskenv
 .env.*
@@ -14,3 +18,16 @@ linux-env/*
 *.flaskenv
 
 instance/*
+
+__pycache__/
+bin/
+build/
+dist/
+
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+*.so
