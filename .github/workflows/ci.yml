@@ -25,5 +25,5 @@ jobs:
 
     - name: Run tests
       run: |
-        cd src\app\tests
+        cd .\src\app\tests
         python -m unittest discover tests
