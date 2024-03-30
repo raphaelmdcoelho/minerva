@@ -1,7 +1,9 @@
-from flask import Blueprint, jsonify, request
-import requests
+from flask import Blueprint, request, Response
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
 
-OPENAI_API_KEY = 'your_api_key_here'
+load_dotenv()
 
 bp = Blueprint('articles', __name__)
 
@@ -12,27 +14,20 @@ def content():
         data = request.get_json()
         prompt = data.get('message')
 
-        if prompt:
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {OPENAI_API_KEY}'
-            }
-
-            payload = {
-                'model': 'text-davinci-003',
-                'prompt': prompt,
-                'temperature': 0.5,
-                'max_tokens': 100
-            }
-
-            response = requests.post('https://api.openai.com/v1/completions', json=payload, headers=headers)
-
-            if response.status_code == 200:
-                return jsonify(response.json()), 200
-            else:
-                return jsonify({"error": "Failed to get response from OpenAI API"}), response.status_code
-        else:
-            return jsonify({"error": "No message provided"}), 400
-    else:
-        return jsonify({"error": "Request must be in JSON format"}), 400
+        print(os.getenv("OPENAI_API_KEY"))
     
+        client = OpenAI(
+            api_key=os.environ.get(os.getenv("OPENAI_API_KEY")),
+        )
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="gpt-3.5-turbo",
+        )
+
+        return Response(chat_completion.choices[0].message.content, status=200, mimetype='application/json')
