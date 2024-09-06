@@ -1,146 +1,8 @@
-# from flask import Blueprint, request, Response
-# from openai import OpenAI
-# import os
-# from dotenv import load_dotenv
-# import json
-# import time
-
-# load_dotenv()
-
-# bp = Blueprint('articles', __name__)
-
-# @bp.route('/content', methods=['POST'])
-# def content():
-#     if request.is_json:
-
-#         prompt = get_prompt(request)         
-    
-#         client = create_client()   
-
-#         chat_completion = create_completition(client, prompt)
-#         initial_content = chat_completion.choices[0].message.content
-
-#         print("Initial Content:", initial_content)
-
-#         grammar_check_assistant = create_assistant(
-#             client,
-#             "Grammar Assistant",
-#             "Grammar and spelling check assistant",
-#             "You are a specialized AI trained to check grammar and spelling errors.",
-#             "gpt-3.5-turbo"
-#         )
-
-#         check_grammar_assistant_thread = create_thread(client) 
-#         message1 = create_message(client, check_grammar_assistant_thread, initial_content)
-#         grammar_checked_response = run_message(client, check_grammar_assistant_thread, grammar_check_assistant, "Please check text for grammar and spelling errors and apply the corrections to the text as a result.")
-#         time.sleep(10)
-
-#         # Get the updated message from the grammar check assistant
-#         while grammar_checked_response.status == "queued":
-#             print(grammar_checked_response.status)
-#             print("Waiting for answer...")
-#             print(check_grammar_assistant_thread.id)
-#             print(grammar_checked_response.id)
-#             run = client.beta.threads.runs.retrieve(
-#                 thread_id=check_grammar_assistant_thread.id,
-#                 run_id=grammar_checked_response.id
-#             )
-#             time.sleep(20)
-
-#         grammar_messages = client.beta.threads.messages.list(
-#             thread_id=check_grammar_assistant_thread.id
-#         )
-
-#         grammar_checked_content = extract_text_content(grammar_messages)
-#         print("Grammar Checked Response Messages:", grammar_messages)
-#         print("Grammar Checked Content:", grammar_checked_content)
-
-#         md_assistant = create_assistant(
-#             client,
-#             "MD Extension Format Assistant",
-#             "Specialized AI trained to convert text to .md format",
-#             "You are a specialized AI trained to convert text to .md format.",
-#             "gpt-3.5-turbo"
-#         )
-        
-#         md_assistant_thread = create_thread(client) 
-#         create_message(client, md_assistant_thread, grammar_checked_content)
-#         md_response = run_message(client, md_assistant_thread, md_assistant, "Make this text as a markdown file with title and subtitles and add a word end at the end of the text. I want a header level 1 being added as a result")
-#         time.sleep(10)
-
-#         # Get the updated message from the markdown assistant
-#         md_messages = client.beta.threads.messages.list(
-#             thread_id=md_assistant_thread.id
-#         )
-
-#         md_content = extract_text_content(md_messages)
-#         print("Markdown Response Messages:", md_messages)
-#         print("Markdown Content:", md_content)
-
-#         return Response(md_content, status=200, mimetype='application/json')
-
-# def get_prompt(request):
-#     data = request.get_json()
-#     return data.get('message')
-
-# def create_client():
-#     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# def create_completition(client, prompt):
-#     return client.chat.completions.create(
-#         messages=[
-#             {
-#                 "role": "user",
-#                 "content": prompt,
-#             }
-#         ],
-#         model="gpt-3.5-turbo",
-#         temperature=0.7,
-#     )
-
-# def create_assistant(client, name, description, instructions, model):
-#     return client.beta.assistants.create(
-#         name=name,
-#         #description=description,
-#         instructions=instructions,
-#         model=model,
-#     )
-
-# def create_thread(client):
-#     return client.beta.threads.create()
-
-# def create_message(client, thread, content):
-#     return client.beta.threads.messages.create(
-#         thread_id=thread.id, 
-#         role="user", 
-#         content=content
-#     )
-
-# def run_message(client, thread, assistant, action):
-#     return client.beta.threads.runs.create(
-#         thread_id=thread.id, 
-#         assistant_id=assistant.id, 
-#         instructions=action
-#     )
-
-# def extract_text_content(messages):
-#     try:
-#         text_blocks = messages.data[0].content
-#         # text_content = " ".join([block.text.value for block in text_blocks if block.type == 'text'])
-#         # return text_content
-#         return text_blocks[0].text.value
-#     except (KeyError, IndexError, TypeError) as e:
-#         print(f"Error extracting text content from messages: {e}")
-#         return None
-
-
-
 from flask import Blueprint, request, Response
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import json
-import time
 
 load_dotenv()
 
@@ -149,80 +11,106 @@ bp = Blueprint('articles', __name__)
 @bp.route('/content', methods=['POST'])
 def content():
     if request.is_json:
+        try:
+            prompt = get_prompt(request)
+            file_type = get_type(request).lower()  # Get the file type and make it lowercase for consistency
 
-        prompt = get_prompt(request)         
-    
-        client = create_client()   
+            client = create_client()
 
-        # ask chat gpt to write the prompt for the steps:
-        chat_completion = create_completition(client, 
-            f"Write a post about {prompt} with up to 1000 words at maximum with. The post should be informative and engaging and not sound like a sales pitch.")
-        initial_content = chat_completion.choices[0].message.content
+            # Auto-GPT iterative refinement
+            refined_content = auto_gpt_refine_content(client, prompt, file_type)
+            print("Refined content:", refined_content)
 
-        print(chat_completion)
+            # Set the mimetype based on the file type
+            mimetype = 'text/markdown' if file_type == 'markdown' else 'text/html' if file_type == 'html' else 'application/json'
 
-        chat_completion_grammar_check = create_completition(client, 
-            f"Act as a grammar english expert and check the following text for grammar and spelling errors and apply the corrections to the text as a result: {initial_content}")
-        grammar_check_content = chat_completion_grammar_check.choices[0].message.content
+            return Response(refined_content, status=200, mimetype=mimetype)
+        except Exception as e:
+            print(f"Error processing request: {e}")
+            return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
+    else:
+        return Response(json.dumps({"error": "Invalid JSON input"}), status=400, mimetype='application/json')
 
-        print(chat_completion_grammar_check)
-
-        md_transformation_completion = create_completition(client, 
-            f"Act as a markdown file format expert and make this text as a markdown format. If necessary add title, subtitles and enumerations for the text: {grammar_check_content}")
-        result_content = md_transformation_completion.choices[0].message.content     
-
-        return Response(result_content, status=200, mimetype='application/json')
 
 def get_prompt(request):
     data = request.get_json()
-    return data.get('message')
+    return data.get('message', 'No prompt provided')
+
+
+def get_type(request):
+    data = request.get_json()
+    return data.get('type', 'Markdown')  # Default to Markdown if type is not provided
+
 
 def create_client():
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+    return OpenAI(api_key=api_key)
 
-def create_completition(client, prompt):
-    return client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-        model="gpt-3.5-turbo",
-        temperature=0.7,
-    )
 
-def create_assistant(client, name, description, instructions, model):
-    return client.beta.assistants.create(
-        name=name,
-        #description=description,
-        instructions=instructions,
-        model=model,
-    )
-
-def create_thread(client):
-    return client.beta.threads.create()
-
-def create_message(client, thread, content):
-    return client.beta.threads.messages.create(
-        thread_id=thread.id, 
-        role="user", 
-        content=content
-    )
-
-def run_message(client, thread, assistant, action):
-    return client.beta.threads.runs.create(
-        thread_id=thread.id, 
-        assistant_id=assistant.id, 
-        instructions=action
-    )
-
-def extract_text_content(messages):
+def create_completion(client, prompt, temperature=0.7):
     try:
-        text_blocks = messages.data[0].content
-        # text_content = " ".join([block.text.value for block in text_blocks if block.type == 'text'])
-        # return text_content
-        return text_blocks[0].text.value
-    except (KeyError, IndexError, TypeError) as e:
-        print(f"Error extracting text content from messages: {e}")
-        return None
+        return client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="gpt-4o",
+            temperature=temperature,
+        )
+    except Exception as e:
+        print(f"Error creating completion: {e}")
+        raise
+
+
+def auto_gpt_refine_content(client, prompt, file_type):
+    # Step 1: Generate initial content
+    initial_content = generate_content(client, prompt)
+
+    # Step 2: Iteratively refine content using AI feedback
+    refined_content = initial_content
+    for _ in range(3):  # Set the number of iterations based on quality needs
+        # Ask GPT to review and improve its own output
+        review_prompt = (
+            f"Review the following article for clarity, coherence, and content quality. "
+            f"Suggest improvements and rewrite sections as necessary: {refined_content}"
+        )
+        review_response = create_completion(client, review_prompt, temperature=0.5)
+        refined_content = review_response.choices[0].message.content
+
+        # Check if the refined content meets quality standards
+        validation_prompt = (
+            f"Evaluate the quality of the following content. Does it meet the standards of a professional blog post? "
+            f"Is it informative, well-structured, and engaging? Provide a rating from 1 to 5 and suggest further improvements if necessary: {refined_content}"
+        )
+        validation_response = create_completion(client, validation_prompt, temperature=0.3)
+        validation_feedback = validation_response.choices[0].message.content
+        print(f"Validation feedback: {validation_feedback}")
+
+        # Optional: Stop refinement early based on feedback quality
+        if "5" in validation_feedback:
+            break
+
+    # Step 3: Final format conversion
+    final_content = format_content(client, refined_content, file_type)
+    return clean_format(final_content)
+
+
+def generate_content(client, prompt):
+    response = create_completion(
+        client,
+        f"Write a detailed blog post on the topic: {prompt}. The article should be informative, provide clear insights, and be suitable for publication on a blog, without sounding promotional.",
+    )
+    return response.choices[0].message.content
+
+
+def format_content(client, content, file_type):
+    response = create_completion(
+        client,
+        f"Act as a {file_type} formatting expert. Format the following text into {file_type}, including titles, subtitles, bullet points, and ensuring it is properly formatted without special characters or escape sequences: {content}",
+        temperature=0.5,
+    )
+    return response.choices[0].message.content
+
+
+def clean_format(text):
+    # Basic cleanup to remove unwanted special characters and escape sequences
+    return text.replace("\\n", "\n").replace("\\", "")
